@@ -58,6 +58,16 @@ I also validated the MCP integration from Claude Desktop (in addition to local i
 
 Screenshots from the Claude Desktop MCP run were captured during validation and can be shared with the submission package.
 
+### Claude Desktop MCP Screenshots
+
+![Claude Desktop MCP run](claude-demo.png)
+
+![Additional MCP calls](additional-mcp-calls.png)
+
+### Test Run Screenshot
+
+![Pytest results](pytest.png)
+
 ## Gymnasium Usage
 
 ```python
