@@ -94,7 +94,7 @@ class TestSemanticStep:
 
 class TestReward:
     def test_reward_in_range(self):
-        env = MarketCanvasEnv()
+        env = MarketCanvasEnv(terminal_reward_only=False)
         env.reset(options={"prompt": "banner with headline"})
 
         # A few actions, then check reward bounds

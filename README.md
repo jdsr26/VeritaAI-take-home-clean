@@ -15,7 +15,7 @@ python demo.py
 python demo.py --prompt "Create a Black Friday banner with a red CTA" --random-steps 20
 ```
 
-This runs three baselines against the prompt *"Create a Summer Sale email banner with a headline, a yellow CTA button, and good contrast"*:
+This runs three baselines against the prompt *"Create a Winter Sale email banner with a headline, a yellow CTA button, and good contrast"*:
 
 | Baseline | Expected Reward | Description |
 |----------|----------------|-------------|
@@ -66,6 +66,14 @@ obs, reward, terminated, truncated, info = env.step_semantic(
 )
 ```
 
+## Tests
+
+```bash
+python -m pytest tests/ -v
+```
+
+The test suite covers observation contract validation, semantic and low-level actions, reward bounds, terminal-only reward mode, episode truncation, and deterministic replay.
+
 ## Project Structure
 
 ```
@@ -79,4 +87,6 @@ src/marketcanvas/
 ├── renderer.py        # PIL rendering to PNG/array
 ├── environment.py     # Gymnasium env wrapper
 └── mcp_server.py      # FastMCP server
+tests/
+└── test_env.py        # 13 pytest tests
 ```

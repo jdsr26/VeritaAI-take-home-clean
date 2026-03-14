@@ -44,7 +44,7 @@ class MarketCanvasEnv(gym.Env):
         canvas_width: int = 800,
         canvas_height: int = 600,
         action_mode: ActionMode | str = ActionMode.SEMANTIC,
-        terminal_reward_only: bool = False,
+        terminal_reward_only: bool = True,
     ) -> None:
         super().__init__()
         self.render_mode = render_mode

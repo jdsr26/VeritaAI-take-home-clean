@@ -6,3 +6,4 @@ build/
 *.egg
 .mypy_cache/
 .ruff_cache/
+test_mcp_client.py
