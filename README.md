@@ -47,6 +47,17 @@ python -m marketcanvas.mcp_server
 
 Exposes tools: `reset_environment`, `get_canvas_state`, `execute_action`, `get_current_reward`, `render_canvas`.
 
+## MCP / Claude Desktop Validation
+
+I also validated the MCP integration from Claude Desktop (in addition to local in-process calls):
+
+- `reset_environment` with a prompt
+- `execute_action` in the same `session_id`
+- `get_current_reward` to confirm reward consistency without advancing steps
+- `render_canvas` for visual sanity checks
+
+Screenshots from the Claude Desktop MCP run were captured during validation and can be shared with the submission package.
+
 ## Gymnasium Usage
 
 ```python
