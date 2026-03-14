@@ -189,3 +189,22 @@ class TestEpisodeTruncation:
         env.reset()
         assert env.step_count == 0
         assert env.canvas.element_count() == 0
+
+
+# ---------------------------------------------------------------------------
+# 6. Deterministic replay — same seed + same actions = same state
+# ---------------------------------------------------------------------------
+
+class TestDeterminism:
+    def test_deterministic_replay(self):
+        states = []
+        for _ in range(2):
+            env = MarketCanvasEnv()
+            env.reset(seed=42, options={"prompt": "banner"})
+            env.step_semantic("add_element", type="text", content="Hi",
+                              x=10, y=10, width=200, height=50)
+            env.step_semantic("add_element", type="shape", content="Buy",
+                              x=100, y=200, width=150, height=60,
+                              color="#FFFF00", text_color="#000000")
+            states.append(env.canvas.to_dict())
+        assert states[0] == states[1]
