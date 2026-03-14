@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: marketcanvas-env
+Version: 0.1.0
+Summary: A minimalist 2D design canvas RL environment with MCP server interface
+Requires-Python: >=3.10
+Requires-Dist: gymnasium>=0.29.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: Pillow>=10.0.0
+Requires-Dist: fastmcp>=2.0.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: ruff; extra == "dev"

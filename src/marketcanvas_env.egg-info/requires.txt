@@ -1,0 +1,9 @@
+gymnasium>=0.29.0
+numpy>=1.24.0
+Pillow>=10.0.0
+fastmcp>=2.0.0
+
+[dev]
+pytest
+mypy
+ruff
