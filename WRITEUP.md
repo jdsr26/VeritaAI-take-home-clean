@@ -1,66 +1,73 @@
 # MarketCanvas-Env — Design Write-Up
 
-## Action and State Space Choices
+## Why I Chose These Action and State Representations
 
-**State Space — Dual Representation:**
-The primary observation is a *semantic state* — a structured JSON dict containing all elements with their properties and computed spatial relations (above, below, overlaps, etc.). This is the natural interface for LLM agents since they already reason over structured text. For future multimodal training, a *visual state* (800×600 RGB array) is also rendered via PIL at each step. The semantic state is lossless and cheap to produce; the visual state enables VLM training but is optional.
+**State — semantic first, visual second.**
+The core observation is a semantic JSON dict: every element on the canvas with its position, size, colors, content, z-index, plus computed spatial relations (above/below/overlaps). I chose this because LLM-based agents already think in structured text — feeding them a JSON blob is the most natural interface. The visual render (800×600 RGB) is there too, mostly for future VLM experiments, but the semantic state is what actually matters for training. It's lossless, cheap to produce, and deterministic — three things a visual render can only approximate.
 
-**Action Space — High-Level Semantic:**
-I implemented high-level semantic actions (`add_element`, `move_element`, `change_color`, etc.) rather than low-level mouse/keyboard primitives. The reasoning:
+Both are returned in the observation: `obs["state_json"]` for the semantic state (serialized so it plays nicely with Gym's space contract), and `obs["visual"]` for the pixel array.
 
-- **Credit assignment**: High-level actions have clear, immediate effects on the canvas state. A `mouse_drag` requires the agent to learn the entire GUI interaction protocol before it can even begin learning design — conflating two unrelated skills.
-- **Sample efficiency**: With semantic actions, each step meaningfully changes the design. PPO with a low-level action space would require orders of magnitude more episodes to learn the same policy.
-- **Determinism**: Semantic actions are trivially deterministic. Low-level actions introduce ambiguity (what does clicking at pixel (312, 450) mean? It depends on the UI layout, which we'd need to simulate).
+**Actions — I went with high-level semantic actions as the primary mode.**
+Things like `add_element`, `move_element`, `change_color`, `delete_element`, etc. The main reason: credit assignment. If the agent wants to "add a yellow CTA button at position (275, 350)", that's one action, one reward signal. With a low-level mouse/keyboard space, the same operation becomes a chain of mouse_move → mouse_drag → mouse_click → keyboard_type steps — and the agent has to figure out GUI interaction *before* it can even start learning design. That's two separate skills conflated, and the sample efficiency hit would be brutal for PPO.
 
-The environment exposes `step_semantic()` for named parameters and `step()` for the standard Gymnasium dict interface, making it usable both programmatically and through RL training loops.
+That said, I also implemented a low-level action space (mouse_move, mouse_click, mouse_drag, keyboard_type) because the assignment said "one or both." You can toggle between them with `action_mode="semantic"` or `action_mode="low_level"`. The low-level mode has a virtual cursor with hit-testing, drag-to-create, click-to-select, and type-to-edit. It's a simplified version of what a computer-use agent would see, minus the full GUI rendering overhead.
 
-## Reward Function Design
+## Reward Function
 
-The reward is a weighted sum of four components, scaled to [-1, 1]:
+Four components, weighted and scaled into [-1, 1]:
 
-| Component | Weight | What It Measures |
+| Component | Weight | What it checks |
 |---|---|---|
-| Constraint Satisfaction | 40% | Are prompt-required elements present? (headline, CTA, specific colors) |
-| Layout Quality | 25% | Overlap penalties, center alignment, bounds checking, visual hierarchy |
-| Accessibility (WCAG) | 20% | Text-background contrast ratios per WCAG 2.0 AA standard |
-| Completeness | 15% | Canvas utilization, element count, effort (step count) |
+| Constraint satisfaction | 40% | Did the agent add what the prompt asked for? (headline, CTA button, specific colors) |
+| Layout quality | 25% | Overlap penalties, alignment, bounds checking, visual hierarchy |
+| Accessibility | 20% | WCAG 2.0 AA contrast ratios between text and background colors |
+| Completeness | 15% | Canvas utilization, element count, minimum effort |
 
-**Formula**: `reward = (0.40*C + 0.25*L + 0.20*A + 0.15*K) * 2 - 1`
+The formula: `total = (0.40×C + 0.25×L + 0.20×A + 0.15×K) × 2 − 1`
 
-The constraint parser extracts requirements from natural-language prompts using keyword matching (e.g., "headline" → requires a text element, "yellow" → requires that color). This is intentionally simple — a production system would use an LLM to parse constraints, but for a deterministic training environment, keyword extraction is sufficient and reproducible.
+I extract constraints from prompts using keyword matching — "headline" means there should be a text element, "yellow CTA" means a yellow-colored shape with button-like text, etc. It's intentionally simple. A production system would parse prompts with an LLM, but for a deterministic training env, regex-based extraction is reproducible and testable.
 
-**Anti-reward-hacking measures:**
-- Elements below 20×20 pixels don't count toward constraints (prevents invisible micro-elements)
+The environment defaults to **terminal-only reward** (`terminal_reward_only=True`), which matches how the assignment frames it — the scalar reward represents an end-of-episode quality score. But it's configurable: pass `terminal_reward_only=False` for dense per-step shaping if you want it (which is what the demo does, so you can see reward improve step by step).
+
+**Things I did to make reward-hacking harder:**
+- Elements under 20×20 pixels don't count (no invisible micro-elements)
 - Elements must be within canvas bounds to be "visible"
-- Clutter penalty above 20 elements (prevents spamming elements)
-- Single-element designs score low on completeness
-- WCAG contrast check catches white-on-white or same-color text tricks (contrast ratio 1:1 = score 0)
+- Clutter penalty kicks in above 20 elements
+- Single-element designs get penalized on completeness
+- WCAG contrast check catches white-on-white tricks (ratio 1:1 = score 0)
 
-**Known loopholes:**
-- The keyword matcher is simple — an agent could satisfy "headline" by adding any text element, regardless of content quality
-- Layout scoring doesn't consider typographic hierarchy beyond "largest text on top"
-- An agent could game completeness by adding exactly 3 medium-sized elements without meaningful content
+**Loopholes I'm aware of:**
+- The keyword matcher is shallow — an agent can satisfy "headline" by adding *any* text element, regardless of what it says
+- Layout scoring doesn't really capture typographic hierarchy beyond "largest text goes near the top"
+- An agent could game completeness by adding exactly 3 medium-sized elements with no meaningful content
 
-## Scaling to 10,000 Parallel PPO Rollouts with a VLM
+I'd address these with a learned reward model in production, but for this take-home the heuristic reward is transparent, deterministic, and easy to debug.
 
-**Anticipated bottlenecks:**
+## How I'd Scale to 10,000 Parallel PPO Rollouts with a VLM
 
-1. **Rendering**: PIL rendering at 800×600 for 10K environments per step is CPU-bound. At ~2ms per render, that's 20 seconds per batch step — PIL is single-threaded and holds the GIL.
-2. **VLM inference / KV-cache memory**: The dominant cost. A VLM policy (e.g., LLaVA-13B) with 10K concurrent rollouts means 10K active KV-caches. At ~1GB per sequence for a 13B model, this exceeds even 8×H100 memory without careful memory management.
-3. **State serialization**: Pydantic `model_dump()` on 10K canvas states per step creates GC pressure. Python's GIL serializes this work even across threads.
+This is where it gets interesting. The environment itself is embarrassingly parallel — no shared state between instances — so the bottleneck isn't the sim, it's everything around it.
 
-**Redesign for scale:**
+**What would break first:**
 
-- **Vectorized environments via `gymnasium.vector.AsyncVectorEnv`**: This is the standard Gymnasium API for parallel rollouts. Each sub-environment runs in its own process, sidestepping the GIL. With 10K envs, partition into ~100 workers each managing 100 envs. The canvas engine is pure Python with no shared state, so this scales linearly.
+1. **Rendering.** PIL at 800×600 for 10K environments is CPU-bound and single-threaded. At ~2ms per render, that's 20 seconds per batch — unacceptable. I'd replace PIL with a GPU rasterizer (something like `nvdiffrast` or a custom CUDA kernel). The canvas elements are just colored rectangles and text labels — trivial to rasterize on a GPU at >100K fps. Or, for semantic-only training, skip rendering entirely and only render during eval.
 
-- **GPU-accelerated rendering**: Replace PIL with a GPU rasterizer (e.g., `nvdiffrast` or a custom CUDA kernel). The canvas elements are simple rectangles and text — this is a trivial rasterization problem that a GPU handles at >100K frames/second. Alternatively, for the semantic-only path, skip rendering entirely during training and only render for eval.
+2. **VLM inference and KV-cache memory.** This is the real wall. A 13B VLM with 10K concurrent rollouts means 10K active KV-caches. At ~1GB each, that blows past even 8×H100 memory without PagedAttention. The fix: use vLLM with PagedAttention, which manages KV-cache like virtual memory pages — non-contiguous physical blocks mapped to logical sequences. Reduces waste from ~60% to <4%, making 10K concurrent sequences feasible. Continuous batching means env steps don't block waiting for the slowest sequence.
 
-- **C++ canvas core**: Rewrite the canvas engine and reward computation in C++ with pybind11 bindings. This eliminates per-element Python object overhead — state becomes a flat struct array. EnvPool (from the SAIL-SG team) provides a framework for exactly this: C++-native vectorized environments with zero-copy observation transfer.
+3. **Python overhead.** Pydantic's `model_dump()` on 10K canvases per step creates GC pressure, and the GIL serializes everything. I'd rewrite the canvas engine in C++ with pybind11, turning element state into flat struct arrays. EnvPool provides a nice framework for this — C++-native vectorized envs with zero-copy observation transfer.
 
-- **VLM inference with PagedAttention**: Use vLLM with PagedAttention to serve the VLM policy. PagedAttention manages KV-cache memory like virtual memory pages — non-contiguous physical blocks mapped to logical sequences. This reduces KV-cache waste from ~60% (naive allocation) to <4%, making 10K concurrent sequences feasible on a single node. Continuous batching in vLLM means environment steps don't block waiting for the slowest sequence in a batch.
+**The architecture I'd use:**
 
-- **Dual interface — Gymnasium for training, MCP for eval**: During PPO training, use the Gymnasium `step()` interface with `AsyncVectorEnv` for maximum throughput. The MCP server interface is reserved for interactive evaluation — connecting Claude Desktop or another LLM client to a single environment instance for qualitative assessment. This separation means the MCP overhead (HTTP, JSON-RPC) never touches the training hot path.
+- `gymnasium.vector.AsyncVectorEnv` with ~100 workers, each managing 100 sub-environments. The canvas engine is pure Python with no shared state, so this scales linearly until you hit Python overhead.
+- For the VLM, vLLM with continuous batching + PagedAttention on the inference side.
+- Double-buffered async pipeline: while the VLM processes batch N, environments execute batch N+1's transitions. Hides env latency behind inference latency.
+- **Gym for training, MCP for eval.** During PPO training, use the `step()` interface with vectorized envs for throughput. The MCP server (which now supports session isolation) is for interactive evaluation — connect Claude or another LLM client to a live environment for qualitative assessment. This way the MCP overhead (HTTP, JSON-RPC) never touches the training hot path.
 
-- **Async pipeline with prefetch**: Decouple environment stepping (CPU) from model inference (GPU) using double-buffered queues. While the VLM processes batch N, environments execute batch N+1's transitions. This hides environment latency behind inference latency (which dominates at ~100ms per step for a 13B VLM).
+The key insight: the environment is trivially parallelizable; the hard problem is VLM inference memory management and latency pipelining.
 
-The key insight is that this environment is *embarrassingly parallel* — no environment instance shares state with another. The real bottleneck is VLM inference memory and latency, which should be addressed through PagedAttention, continuous batching, and async pipelining rather than environment-side optimizations.
+## Testing & Verification
+
+I verified the implementation through three complementary methods:
+
+- **pytest suite** (`tests/test_env.py`): 13 tests covering observation contract, semantic actions, low-level actions, reward bounds, terminal-only reward mode, episode truncation, and deterministic replay
+- **Demo baselines** (`demo.py`): NOP (blank canvas, scores ~-0.8), oracle (scripted reference policy, scores ~+0.95), and random agent (15 random steps, variable score) — shows the reward function has the right shape and the right spread
+- **MCP smoke test**: Verified the FastMCP server end-to-end by chaining `reset_environment` → `execute_action` → `get_current_reward` with session isolation, confirming state transitions, reward computation, and session independence all work correctly

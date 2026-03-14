@@ -11,7 +11,7 @@ from marketcanvas.environment import MarketCanvasEnv
 from marketcanvas.renderer import save_png
 
 
-DEFAULT_PROMPT = "Create a winter Sale email banner with a headline, a yellow CTA button, and good contrast"
+DEFAULT_PROMPT = "Create a Summer Sale email banner with a headline, a yellow CTA button, and good contrast"
 
 
 def print_reward(label: str, env: MarketCanvasEnv) -> None:
@@ -68,7 +68,7 @@ def run_oracle(prompt: str) -> None:
     # Step 2: Add headline text
     _, r, _, _, _ = env.step_semantic(
         "add_element",
-        type="text", content="Winter Sale — Up to 50% Off!",
+        type="text", content="Summer Sale — Up to 50% Off!",
         x=100, y=80, width=600, height=80,
         color="#1A1A5E", text_color="#FFFFFF",
     )
