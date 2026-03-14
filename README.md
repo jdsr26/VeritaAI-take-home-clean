@@ -56,6 +56,12 @@ I also validated the MCP integration from Claude Desktop (in addition to local i
 - `get_current_reward` to confirm reward consistency without advancing steps
 - `render_canvas` for visual sanity checks
 
+Verification summary:
+
+- Verified `reset_environment` with prompt `"Create a Winter Sale banner"`; received a fresh `session_id` and initialized empty 800x600 canvas state.
+- Verified `execute_action` + `get_current_reward` consistency in the same session (same reward breakdown when no additional step is taken).
+- Verified `pytest tests/test_env.py -v` passes (13/13).
+
 Screenshots from the Claude Desktop MCP run were captured during validation and can be shared with the submission package.
 
 ### Claude Desktop MCP Screenshots
