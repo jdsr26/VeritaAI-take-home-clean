@@ -39,7 +39,7 @@ def run_nop_baseline(prompt: str) -> None:
     print("  BASELINE 1: NOP (No Actions)")
     print("#"*60)
 
-    env = MarketCanvasEnv()
+    env = MarketCanvasEnv(terminal_reward_only=False)
     env.reset(options={"prompt": prompt})
     print_reward("NOP Baseline", env)
     print_final_state("NOP", env)
@@ -53,7 +53,7 @@ def run_oracle(prompt: str) -> None:
     print("  BASELINE 2: Oracle (Scripted Perfect Design)")
     print("#"*60)
 
-    env = MarketCanvasEnv()
+    env = MarketCanvasEnv(terminal_reward_only=False)
     env.reset(options={"prompt": prompt})
 
     # Step 1: Add a background banner shape
@@ -113,7 +113,7 @@ def run_random_agent(prompt: str, n_steps: int = 15) -> None:
     print(f"  BASELINE 3: Random Agent ({n_steps} steps)")
     print("#"*60)
 
-    env = MarketCanvasEnv()
+    env = MarketCanvasEnv(terminal_reward_only=False)
     env.reset(options={"prompt": prompt})
 
     random.seed(42)
