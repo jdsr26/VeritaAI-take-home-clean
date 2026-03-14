@@ -48,9 +48,9 @@ def run_nop_baseline(prompt: str) -> None:
 
 
 def run_oracle(prompt: str) -> None:
-    """Scripted perfect design — should score near +1.0."""
+    """Scripted reference policy — should score near +1.0."""
     print("\n" + "#"*60)
-    print("  BASELINE 2: Oracle (Scripted Perfect Design)")
+    print("  BASELINE 2: Oracle (Scripted Reference Policy)")
     print("#"*60)
 
     env = MarketCanvasEnv(terminal_reward_only=False)

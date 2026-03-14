@@ -20,7 +20,7 @@ This runs three baselines against the prompt *"Create a Winter Sale email banner
 | Baseline | Expected Reward | Description |
 |----------|----------------|-------------|
 | NOP | ~-0.8 | Zero actions, blank canvas |
-| Oracle | ~+0.95 | Scripted optimal design |
+| Oracle | ~+0.95 | Scripted reference policy |
 | Random | Varies by seed; can be positive | 15 random actions |
 
 ## Demo Output
