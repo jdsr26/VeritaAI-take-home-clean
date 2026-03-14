@@ -61,11 +61,9 @@ class MarketCanvasEnv(gym.Env):
 
         self.action_space = self._build_action_space(canvas_width, canvas_height)
 
-        # Primary observation is structured semantic state; visual is secondary.
-        # Gym Dict/Sequence cannot natively describe variable-length element
-        # lists, so the semantic state is provided as a parsed Python dict in
-        # obs["state"] and additionally serialised as obs["state_json"] for
-        # agents that prefer a flat string representation.
+        # Primary observation is the semantic state serialised as JSON;
+        # visual RGB is secondary.  Agents that need a parsed dict can call
+        # json.loads(obs["state_json"]).  The full dict is also in info["state"].
         self.observation_space = spaces.Dict({
             "state_json": spaces.Text(max_length=50000),
             "visual": spaces.Box(0, 255, shape=(canvas_height, canvas_width, 3), dtype=np.uint8),
@@ -137,7 +135,6 @@ class MarketCanvasEnv(gym.Env):
     def _get_obs(self) -> dict[str, Any]:
         semantic_state = self.canvas.to_dict()
         return {
-            "state": semantic_state,
             "state_json": json.dumps(semantic_state, separators=(",", ":"), sort_keys=True),
             "visual": render_to_array(self.canvas),
         }
