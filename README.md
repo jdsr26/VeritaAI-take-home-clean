@@ -12,6 +12,7 @@ pip install -e .
 
 ```bash
 python demo.py
+python demo.py --prompt "Create a Black Friday banner with a red CTA" --random-steps 20
 ```
 
 This runs three baselines against the prompt *"Create a Summer Sale email banner with a headline, a yellow CTA button, and good contrast"*:
@@ -53,6 +54,9 @@ from marketcanvas import MarketCanvasEnv
 
 env = MarketCanvasEnv()
 obs, info = env.reset(options={"prompt": "Create a banner with a headline and CTA button"})
+
+# Semantic JSON state is part of the observation now.
+print(obs["state_json"])
 
 obs, reward, terminated, truncated, info = env.step_semantic(
     "add_element",
