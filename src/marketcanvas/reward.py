@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from marketcanvas.canvas import Canvas
-from marketcanvas.contrast import contrast_ratio, wcag_score
+from marketcanvas.contrast import wcag_score
 from marketcanvas.elements import Element, ElementType
 from marketcanvas.prompt_parser import ParsedPrompt
 from marketcanvas.spatial import iou, centers_aligned
@@ -42,7 +42,7 @@ def compute_reward(
 
     c = _constraint_score(visible, parsed_prompt)
     l = _layout_score(visible, canvas)
-    a = _accessibility_score(visible, canvas)
+    a = _accessibility_score(visible)
     comp = _completeness_score(visible, canvas, step_count, max_steps)
 
     raw = W_CONSTRAINT * c + W_LAYOUT * l + W_ACCESSIBILITY * a + W_COMPLETENESS * comp
@@ -108,18 +108,17 @@ def _hierarchy_score(elements: list[Element], canvas: Canvas) -> float:
     return points / checks if checks > 0 else 0.5
 
 
-def _accessibility_score(elements: list[Element], canvas: Canvas) -> float:
+def _accessibility_score(elements: list[Element]) -> float:
     text_els = [e for e in elements if e.type == ElementType.TEXT]
     if not text_els:
         return 0.5  # neutral if no text
 
     scores: list[float] = []
     for el in text_els:
-        # Check text color against element background
+        # Check text color against the element background.
+        # This rewards local readability where the text is actually rendered.
         large = el.height >= 24
         scores.append(wcag_score(el.text_color, el.color, large_text=large))
-        # Also check against canvas background
-        scores.append(wcag_score(el.color, canvas.background, large_text=large))
 
     return sum(scores) / len(scores)
 

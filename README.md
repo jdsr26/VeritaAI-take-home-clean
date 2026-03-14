@@ -18,9 +18,25 @@ This runs three baselines against the prompt *"Create a Summer Sale email banner
 
 | Baseline | Expected Reward | Description |
 |----------|----------------|-------------|
-| NOP | ~-1.0 | Zero actions, blank canvas |
-| Oracle | ~+0.7 | Scripted optimal design |
-| Random | -0.5 to 0.0 | 15 random actions |
+| NOP | ~-0.8 | Zero actions, blank canvas |
+| Oracle | ~+0.95 | Scripted optimal design |
+| Random | Varies by seed; can be positive | 15 random actions |
+
+## Demo Output
+
+The demo script saves example renders in the project root:
+
+### Oracle Output
+
+![Oracle result](output_oracle.png)
+
+### Random Output
+
+![Random result](output_random.png)
+
+### NOP Output
+
+![NOP result](output_nop.png)
 
 ## MCP Server
 

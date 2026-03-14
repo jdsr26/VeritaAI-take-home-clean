@@ -4,8 +4,8 @@ from typing import Any
 
 from fastmcp import FastMCP
 
+from marketcanvas.actions import apply_semantic_action
 from marketcanvas.canvas import Canvas
-from marketcanvas.elements import ElementType
 from marketcanvas.prompt_parser import parse_prompt, ParsedPrompt
 from marketcanvas.renderer import render_to_base64
 from marketcanvas.reward import compute_reward
@@ -39,33 +39,7 @@ def execute_action(action_type: str, params: dict[str, Any]) -> dict[str, Any]:
     """Execute an action on the canvas. Returns new state, reward, and done flag."""
     global _step_count
     _step_count += 1
-
-    if action_type == "add_element":
-        elem_type = params.get("type", "shape")
-        if isinstance(elem_type, str):
-            elem_type = ElementType(elem_type)
-        _canvas.add_element(
-            type=elem_type,
-            content=params.get("content", ""),
-            x=int(params.get("x", 0)),
-            y=int(params.get("y", 0)),
-            width=int(params.get("width", 100)),
-            height=int(params.get("height", 50)),
-            color=params.get("color", "#000000"),
-            text_color=params.get("text_color", "#FFFFFF"),
-        )
-    elif action_type == "move_element":
-        _canvas.move_element(params["id"], int(params["new_x"]), int(params["new_y"]))
-    elif action_type == "resize_element":
-        _canvas.resize_element(params["id"], int(params["new_width"]), int(params["new_height"]))
-    elif action_type == "change_color":
-        _canvas.change_color(params["id"], params["hex_code"])
-    elif action_type == "change_text":
-        _canvas.change_text(params["id"], params["new_content"])
-    elif action_type == "delete_element":
-        _canvas.delete_element(params["id"])
-    elif action_type == "set_z_index":
-        _canvas.set_z_index(params["id"], int(params["new_z"]))
+    apply_semantic_action(_canvas, action_type, params)
 
     reward = compute_reward(_canvas, _parsed_prompt, _step_count, _max_steps)
     done = _step_count >= _max_steps

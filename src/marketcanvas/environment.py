@@ -6,6 +6,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
+from marketcanvas.actions import apply_semantic_action
 from marketcanvas.canvas import Canvas
 from marketcanvas.elements import ElementType
 from marketcanvas.prompt_parser import ParsedPrompt, parse_prompt
@@ -136,32 +137,4 @@ class MarketCanvasEnv(gym.Env):
         self._execute_semantic(action_type, action)
 
     def _execute_semantic(self, action_type: str, params: dict[str, Any]) -> None:
-        if action_type == "add_element":
-            elem_type = params.get("type", "shape")
-            if isinstance(elem_type, str):
-                elem_type = ElementType(elem_type)
-            elif isinstance(elem_type, int):
-                elem_type = list(ElementType)[elem_type]
-            self.canvas.add_element(
-                type=elem_type,
-                content=params.get("content", ""),
-                x=int(params.get("x", 0)),
-                y=int(params.get("y", 0)),
-                width=int(params.get("width", 100)),
-                height=int(params.get("height", 50)),
-                color=params.get("color", "#000000"),
-                text_color=params.get("text_color", "#FFFFFF"),
-            )
-        elif action_type == "move_element":
-            self.canvas.move_element(params["id"], int(params["new_x"]), int(params["new_y"]))
-        elif action_type == "resize_element":
-            self.canvas.resize_element(params["id"], int(params["new_width"]), int(params["new_height"]))
-        elif action_type == "change_color":
-            self.canvas.change_color(params["id"], params["hex_code"])
-        elif action_type == "change_text":
-            self.canvas.change_text(params["id"], params["new_content"])
-        elif action_type == "delete_element":
-            self.canvas.delete_element(params["id"])
-        elif action_type == "set_z_index":
-            self.canvas.set_z_index(params["id"], int(params["new_z"]))
-        # noop: do nothing
+        apply_semantic_action(self.canvas, action_type, params)
