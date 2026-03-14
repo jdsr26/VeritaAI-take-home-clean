@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import Enum
-import json
 from typing import Any
 
 import gymnasium as gym
@@ -44,7 +43,6 @@ class MarketCanvasEnv(gym.Env):
         canvas_width: int = 800,
         canvas_height: int = 600,
         action_mode: ActionMode | str = ActionMode.SEMANTIC,
-        terminal_reward_only: bool = False,
     ) -> None:
         super().__init__()
         self.render_mode = render_mode
@@ -52,7 +50,6 @@ class MarketCanvasEnv(gym.Env):
         self.canvas_width = canvas_width
         self.canvas_height = canvas_height
         self.action_mode = ActionMode(action_mode)
-        self.terminal_reward_only = terminal_reward_only
 
         self.canvas = Canvas(canvas_width, canvas_height)
         self.parsed_prompt = ParsedPrompt(raw="")
@@ -61,13 +58,8 @@ class MarketCanvasEnv(gym.Env):
 
         self.action_space = self._build_action_space(canvas_width, canvas_height)
 
-        # Primary observation is structured semantic state; visual is secondary.
-        # Gym Dict/Sequence cannot natively describe variable-length element
-        # lists, so the semantic state is provided as a parsed Python dict in
-        # obs["state"] and additionally serialised as obs["state_json"] for
-        # agents that prefer a flat string representation.
+        # Observation: semantic state dict (JSON-serializable via info)
         self.observation_space = spaces.Dict({
-            "state_json": spaces.Text(max_length=50000),
             "visual": spaces.Box(0, 255, shape=(canvas_height, canvas_width, 3), dtype=np.uint8),
         })
 
@@ -110,18 +102,12 @@ class MarketCanvasEnv(gym.Env):
         reward_bd = compute_reward(self.canvas, self.parsed_prompt, self.step_count, self.max_steps)
         terminated = False
         truncated = self.step_count >= self.max_steps
-        is_terminal = terminated or truncated
-
-        # When terminal_reward_only is set, intermediate steps return 0.0 so
-        # credit assignment is deferred to the end of the episode.
-        reward = reward_bd.total if (not self.terminal_reward_only or is_terminal) else 0.0
 
         obs = self._get_obs()
         info = self._get_info()
         info["reward_breakdown"] = reward_bd.to_dict()
-        info["is_terminal"] = is_terminal
 
-        return obs, reward, terminated, truncated, info
+        return obs, reward_bd.total, terminated, truncated, info
 
     def render(self) -> np.ndarray | None:
         if self.render_mode == "rgb_array":
@@ -135,12 +121,7 @@ class MarketCanvasEnv(gym.Env):
         return compute_reward(self.canvas, self.parsed_prompt, self.step_count, self.max_steps)
 
     def _get_obs(self) -> dict[str, Any]:
-        semantic_state = self.canvas.to_dict()
-        return {
-            "state": semantic_state,
-            "state_json": json.dumps(semantic_state, separators=(",", ":"), sort_keys=True),
-            "visual": render_to_array(self.canvas),
-        }
+        return {"visual": render_to_array(self.canvas)}
 
     def _get_info(self) -> dict[str, Any]:
         return {
@@ -154,22 +135,13 @@ class MarketCanvasEnv(gym.Env):
         if self.action_mode == ActionMode.SEMANTIC:
             return spaces.Dict({
                 "action_type": spaces.Discrete(len(_ACTION_TYPES)),
-                "id": spaces.Text(max_length=32),
-                "type": spaces.Discrete(len(ElementType)),
-                "content": spaces.Text(max_length=512),
                 "x": spaces.Box(0, canvas_width, shape=(), dtype=np.int32),
                 "y": spaces.Box(0, canvas_height, shape=(), dtype=np.int32),
-                "new_x": spaces.Box(0, canvas_width, shape=(), dtype=np.int32),
-                "new_y": spaces.Box(0, canvas_height, shape=(), dtype=np.int32),
                 "width": spaces.Box(1, canvas_width, shape=(), dtype=np.int32),
                 "height": spaces.Box(1, canvas_height, shape=(), dtype=np.int32),
-                "new_width": spaces.Box(1, canvas_width, shape=(), dtype=np.int32),
-                "new_height": spaces.Box(1, canvas_height, shape=(), dtype=np.int32),
-                "color": spaces.Text(max_length=7),
-                "text_color": spaces.Text(max_length=7),
-                "hex_code": spaces.Text(max_length=7),
-                "new_content": spaces.Text(max_length=512),
-                "new_z": spaces.Box(0, 1000, shape=(), dtype=np.int32),
+                "element_type": spaces.Discrete(len(ElementType)),
+                "element_idx": spaces.Discrete(21),  # max 20 elements + 0
+                "z_index": spaces.Discrete(21),
             })
 
         return spaces.Dict({

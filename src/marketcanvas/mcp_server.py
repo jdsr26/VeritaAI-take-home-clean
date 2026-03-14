@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 from fastmcp import FastMCP
@@ -12,57 +13,89 @@ from marketcanvas.reward import compute_reward
 
 mcp = FastMCP("MarketCanvas")
 
-_canvas = Canvas()
-_parsed_prompt = ParsedPrompt(raw="")
-_step_count = 0
-_max_steps = 50
+# ---------------------------------------------------------------------------
+# Session management — each caller can work with an isolated canvas.
+# A default session ("default") provides backward-compatible single-client
+# usage; callers that need isolation pass an explicit session_id.
+# ---------------------------------------------------------------------------
+
+_DEFAULT_SESSION = "default"
+
+
+class _Session:
+    __slots__ = ("canvas", "parsed_prompt", "step_count", "max_steps")
+
+    def __init__(self, max_steps: int = 50) -> None:
+        self.canvas = Canvas()
+        self.parsed_prompt = ParsedPrompt(raw="")
+        self.step_count = 0
+        self.max_steps = max_steps
+
+
+_sessions: dict[str, _Session] = {}
+
+
+def _get_session(session_id: str | None) -> _Session:
+    sid = session_id or _DEFAULT_SESSION
+    if sid not in _sessions:
+        _sessions[sid] = _Session()
+    return _sessions[sid]
 
 
 @mcp.tool
-def reset_environment(prompt: str) -> dict[str, Any]:
-    """Reset canvas and set a new target prompt."""
-    global _canvas, _parsed_prompt, _step_count
-    _canvas = Canvas()
-    _parsed_prompt = parse_prompt(prompt)
-    _step_count = 0
-    return {"state": _canvas.to_dict(), "prompt": prompt}
+def reset_environment(prompt: str, session_id: str | None = None) -> dict[str, Any]:
+    """Reset canvas and set a new target prompt.
+
+    Pass *session_id* to operate on an isolated session.  Omit it (or pass
+    ``None``) to use the shared default session.  Returns new session_id so
+    callers can track it.
+    """
+    sid = session_id or str(uuid.uuid4())
+    sess = _Session()
+    sess.parsed_prompt = parse_prompt(prompt)
+    _sessions[sid] = sess
+    return {"state": sess.canvas.to_dict(), "prompt": prompt, "session_id": sid}
 
 
 @mcp.tool
-def get_canvas_state() -> dict[str, Any]:
+def get_canvas_state(session_id: str | None = None) -> dict[str, Any]:
     """Returns semantic JSON state of the canvas."""
-    return _canvas.to_dict()
+    sess = _get_session(session_id)
+    return sess.canvas.to_dict()
 
 
 @mcp.tool
-def execute_action(action_type: str, params: dict[str, Any]) -> dict[str, Any]:
+def execute_action(action_type: str, params: dict[str, Any], session_id: str | None = None) -> dict[str, Any]:
     """Execute an action on the canvas. Returns new state, reward, and done flag."""
-    global _step_count
-    _step_count += 1
-    apply_semantic_action(_canvas, action_type, params)
+    sess = _get_session(session_id)
+    sess.step_count += 1
+    apply_semantic_action(sess.canvas, action_type, params)
 
-    reward = compute_reward(_canvas, _parsed_prompt, _step_count, _max_steps)
-    done = _step_count >= _max_steps
+    reward = compute_reward(sess.canvas, sess.parsed_prompt, sess.step_count, sess.max_steps)
+    done = sess.step_count >= sess.max_steps
 
     return {
-        "state": _canvas.to_dict(),
+        "state": sess.canvas.to_dict(),
         "reward": reward.to_dict(),
         "done": done,
-        "step": _step_count,
+        "step": sess.step_count,
+        "session_id": session_id or _DEFAULT_SESSION,
     }
 
 
 @mcp.tool
-def get_current_reward() -> dict[str, Any]:
+def get_current_reward(session_id: str | None = None) -> dict[str, Any]:
     """Calculate and return current reward without stepping."""
-    reward = compute_reward(_canvas, _parsed_prompt, _step_count, _max_steps)
+    sess = _get_session(session_id)
+    reward = compute_reward(sess.canvas, sess.parsed_prompt, sess.step_count, sess.max_steps)
     return reward.to_dict()
 
 
 @mcp.tool
-def render_canvas() -> str:
+def render_canvas(session_id: str | None = None) -> str:
     """Returns base64-encoded PNG of current canvas."""
-    return render_to_base64(_canvas)
+    sess = _get_session(session_id)
+    return render_to_base64(sess.canvas)
 
 
 if __name__ == "__main__":
