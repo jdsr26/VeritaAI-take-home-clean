@@ -12,7 +12,6 @@ pip install -e .
 
 ```bash
 python demo.py
-python demo.py --prompt "Create a Black Friday banner with a red CTA" --random-steps 20
 ```
 
 This runs three baselines against the prompt *"Create a Summer Sale email banner with a headline, a yellow CTA button, and good contrast"*:
